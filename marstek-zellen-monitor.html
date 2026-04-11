@@ -75,6 +75,9 @@
   .edit-select{width:100%;padding:10px;border:2px solid var(--accent);background:#eff6ff;color:var(--t1);font-family:Arial;font-size:1rem;font-weight:700;box-sizing:border-box;text-transform:none}
   .edit-btn{padding:10px 18px;border:2px solid var(--accent);background:#eff6ff;color:var(--accent);font-family:Arial;font-size:1rem;font-weight:700;cursor:pointer;text-transform:uppercase}
   .edit-btn.on{background:var(--on);color:#fff;border-color:var(--on)}
+  .val.pending{outline:3px solid #f59e0b;outline-offset:-3px;animation:pulse 1s ease-in-out infinite}
+  .val.saved{outline:3px solid var(--on);outline-offset:-3px;transition:outline-color .8s}
+  @keyframes pulse{0%,100%{outline-color:#f59e0b}50%{outline-color:#fbbf24}}
 </style>
 </head>
 <body>
@@ -685,6 +688,7 @@ function handleState(s) {
   } else {
     S[key] = s.state;
   }
+  markSaved(eid);
   scheduleRender();
 }
 
@@ -714,6 +718,32 @@ const HIGH_POWER_ENTITIES = {
   'number.marstek_venus_modbus_maximale_entladeleistung': 'maxDischarge',
   'number.marstek_venus_modbus_entladeleistung_einstellen':'setDischarge'
 };
+const ENTITY_WRAP_MAP = {
+  'select.marstek_venus_modbus_benutzer_modus':            'm_mode_wrap',
+  'switch.marstek_venus_modbus_backup_funktion':           'm_backup_wrap',
+  'number.marstek_venus_modbus_maximale_ladeleistung':     'm_max_chg_wrap',
+  'number.marstek_venus_modbus_maximale_entladeleistung':  'm_max_dchg_wrap',
+  'number.marstek_venus_modbus_entladeleistung_einstellen':'m_set_dchg_wrap'
+};
+function markPending(entity) {
+  const id = ENTITY_WRAP_MAP[entity];
+  if (!id) return;
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('saved');
+  el.classList.add('pending');
+  el.dataset.pending = '1';
+}
+function markSaved(entity) {
+  const id = ENTITY_WRAP_MAP[entity];
+  if (!id) return;
+  const el = document.getElementById(id);
+  if (!el || !el.dataset.pending) return;
+  delete el.dataset.pending;
+  el.classList.remove('pending');
+  el.classList.add('saved');
+  setTimeout(() => el.classList.remove('saved'), 1500);
+}
 function setNum(entity, value, el) {
   const v = parseFloat(value);
   if (isNaN(v)) return;
@@ -723,12 +753,15 @@ function setNum(entity, value, el) {
       return;
     }
   }
+  markPending(entity);
   callService('number', 'set_value', { entity_id: entity, value: v });
 }
 function setSelect(entity, option) {
+  markPending(entity);
   callService('select', 'select_option', { entity_id: entity, option: option });
 }
 function setSwitch(entity, on) {
+  markPending(entity);
   callService('switch', on ? 'turn_on' : 'turn_off', { entity_id: entity });
 }
 function renderEditableFields() {
@@ -742,7 +775,7 @@ function renderEditableFields() {
     }).join('');
     $('m_mode_wrap').innerHTML = `<select class="edit-select" onchange="setSelect('select.marstek_venus_modbus_benutzer_modus', this.value)">${opts}</select>`;
     const bon = S.backup === 'on';
-    $('m_backup_wrap').innerHTML = `<button class="edit-btn${bon?' on':''}" onclick="setSwitch('switch.marstek_venus_modbus_backup_funktion', ${!bon})">${bon?t('yes_l'):t('no_l')}</button>`;
+    $('m_backup_wrap').innerHTML = `<button class="edit-btn${bon?' on':''}" onclick="setSwitch('switch.marstek_venus_modbus_backup_funktion', S.backup!=='on')">${bon?t('yes_l'):t('no_l')}</button>`;
     $('m_max_chg_wrap').innerHTML = `<input class="edit-input" type="number" min="0" max="2500" step="50" value="${S.maxCharge ?? 0}" onchange="setNum('number.marstek_venus_modbus_maximale_ladeleistung', this.value, this)"><span class="u"> W</span>`;
     $('m_max_dchg_wrap').innerHTML = `<input class="edit-input" type="number" min="0" max="2500" step="50" value="${S.maxDischarge ?? 0}" onchange="setNum('number.marstek_venus_modbus_maximale_entladeleistung', this.value, this)"><span class="u"> W</span>`;
     $('m_set_dchg_wrap').innerHTML = `<input class="edit-input" type="number" min="0" max="2500" step="50" value="${S.setDischarge ?? 0}" onchange="setNum('number.marstek_venus_modbus_entladeleistung_einstellen', this.value, this)"><span class="u"> W</span>`;
@@ -809,17 +842,27 @@ function renderSystem() {
   // Temperature
   $('m_temp').textContent = fmt(S.temp, 1);
 
-  // User mode (translate known values; skip if in edit mode)
+  // User mode — read-only span OR edit-mode select
   if ($('m_mode')) {
     const modeKey = 'mode_' + (S.userMode || '');
     $('m_mode').textContent = (S.userMode && I18N[LANG][modeKey]) ? I18N[LANG][modeKey] : (S.userMode || '–');
+  } else {
+    const sel = $('m_mode_wrap') && $('m_mode_wrap').querySelector('select');
+    if (sel && document.activeElement !== sel && S.userMode && S.userMode !== '–') sel.value = S.userMode;
   }
 
-  // Backup (skip if in edit mode)
+  // Backup — read-only span OR edit-mode button
   if ($('m_backup')) {
     const bon = S.backup === 'on';
     $('m_backup').textContent = S.backup === '–' ? '–' : (bon ? t('yes_l') : t('no_l'));
     $('m_backup').style.color = bon ? 'var(--on)' : 'var(--t3)';
+  } else {
+    const btn = $('m_backup_wrap') && $('m_backup_wrap').querySelector('button');
+    if (btn) {
+      const bon = S.backup === 'on';
+      btn.className = 'edit-btn' + (bon ? ' on' : '');
+      btn.textContent = S.backup === '–' ? '–' : (bon ? t('yes_l') : t('no_l'));
+    }
   }
 
   // Electrical
@@ -838,10 +881,17 @@ function renderSystem() {
   $('m_cyc_calc').textContent = fmt(S.cyclesCalc, 2);
   $('m_rt_month').textContent = fmt(S.roundtripMonth, 1);
 
-  // Limits (skip if in edit mode)
-  if ($('m_max_chg'))  $('m_max_chg').textContent  = fmtInt(S.maxCharge);
-  if ($('m_max_dchg')) $('m_max_dchg').textContent = fmtInt(S.maxDischarge);
-  if ($('m_set_dchg')) $('m_set_dchg').textContent = fmtInt(S.setDischarge);
+  // Limits — read-only spans OR edit-mode number inputs (updated only if not focused)
+  const updateNumField = (id, val) => {
+    const span = $(id);
+    if (span) { span.textContent = fmtInt(val); return; }
+    const wrap = $(id + '_wrap');
+    const inp = wrap && wrap.querySelector('input');
+    if (inp && document.activeElement !== inp && val != null) inp.value = Math.round(val);
+  };
+  updateNumField('m_max_chg',  S.maxCharge);
+  updateNumField('m_max_dchg', S.maxDischarge);
+  updateNumField('m_set_dchg', S.setDischarge);
 
   // Device info
   $('m_dev_name').textContent = S.deviceName || '–';
