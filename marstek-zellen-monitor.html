@@ -701,8 +701,8 @@ function renderSystem() {
   } else {
     const abs = Math.abs(bp);
     let arrow = '', lbl = t('st_idle'), col = 'var(--t2)';
-    if (bp > 5)       { arrow = '↑ '; lbl = t('st_discharging'); col = 'var(--accent)'; }
-    else if (bp < -5) { arrow = '↓ '; lbl = t('st_charging');    col = 'var(--on)'; }
+    if (bp > 5)       { arrow = '↓ '; lbl = t('st_charging');    col = 'var(--on)'; }
+    else if (bp < -5) { arrow = '↑ '; lbl = t('st_discharging'); col = 'var(--accent)'; }
     $('m_battpw').innerHTML = arrow + abs.toFixed(0) + '<span class="u"> W</span>';
     $('m_battpw').style.color = col;
     $('m_battpw_sub').textContent = lbl;
