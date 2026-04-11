@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marstek Venus E – Cell Monitor</title>
+<style>
+  :root{
+    --bg:#f5f5f0;--bg1:#ffffff;--bg2:#fafaf5;
+    --brd:#9ca3af;--brd2:#d1d5db;
+    --t1:#111827;--t2:#374151;--t3:#6b7280;
+    --batt:#0e7490;--on:#15803d;--warn:#a16207;--danger:#b91c1c;
+    --accent:#1d4ed8;--haus:#6d28d9;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;padding:20px;font-size:16px;line-height:1.5}
+  .dash{max-width:1400px;margin:0 auto}
+  .hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--bg1);border:2px solid var(--t1);margin-bottom:18px}
+  .hdr h1{font-size:1.5rem;font-weight:700;color:var(--t1)}
+  .hdr-r{display:flex;align-items:center;gap:14px}
+  .conn{width:14px;height:14px;border-radius:50%;background:var(--danger);border:2px solid var(--t1)}
+  .conn.ok{background:var(--on)}
+  .hdr .t{font-size:0.95rem;color:var(--t1);font-weight:600}
+  .row{display:grid;gap:14px;margin-bottom:18px}
+  .r3{grid-template-columns:repeat(3,1fr)}
+  .r4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:700px){.r3,.r4{grid-template-columns:1fr}}
+  .c{background:var(--bg1);border:2px solid var(--brd);padding:18px;position:relative}
+  .c::before{content:'';position:absolute;top:0;left:0;right:0;height:5px;background:var(--batt)}
+  .lbl{font-size:0.85rem;text-transform:uppercase;letter-spacing:.04em;color:var(--t2);margin-bottom:8px;font-weight:700}
+  .val{font-size:1.8rem;font-weight:700;line-height:1.1;color:var(--t1)}
+  .val.big{font-size:2.4rem}
+  .u{font-size:0.95rem;font-weight:600;color:var(--t2)}
+  .sub{font-size:0.9rem;color:var(--t2);margin-top:8px;font-weight:500}
+  .sec{background:var(--bg1);border:2px solid var(--brd);padding:20px;margin-bottom:18px}
+  .sec-t{font-size:1.1rem;font-weight:700;color:var(--t1);text-transform:uppercase;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--t1)}
+  .cw{position:relative;width:100%;height:340px}
+  canvas{width:100%!important;height:100%!important}
+  .info-tbl{width:100%;border-collapse:collapse;font-size:0.95rem;border:2px solid var(--brd)}
+  .info-tbl td{padding:10px 14px;border-bottom:1px solid var(--brd2)}
+  .info-tbl tr:nth-child(even){background:var(--bg2)}
+  .info-tbl td:first-child{color:var(--t1);width:40%;font-weight:700}
+  .comfort{display:flex;align-items:center;gap:12px;padding:14px 20px;border:2px solid;font-size:1.05rem;font-weight:600}
+  .comfort.ok{background:#dcfce7;border-color:var(--on);color:var(--on)}
+  .comfort.warn{background:#fef3c7;border-color:var(--warn);color:var(--warn)}
+  .comfort.bad{background:#fee2e2;border-color:var(--danger);color:var(--danger)}
+  /* Setup Wizard */
+  .wizard{max-width:700px;margin:40px auto;background:var(--bg1);border:2px solid var(--t1);padding:30px}
+  .wizard h2{font-size:1.5rem;margin-bottom:14px;color:var(--t1)}
+  .wizard p{margin-bottom:14px;color:var(--t2)}
+  .wizard label{display:block;font-weight:700;margin:18px 0 6px;color:var(--t1)}
+  .wizard input{width:100%;padding:12px;border:2px solid var(--brd);font-size:1rem;font-family:Arial;background:var(--bg2);color:var(--t1)}
+  .wizard input:focus{outline:none;border-color:var(--accent);background:#fff}
+  .wizard .hint{font-size:0.85rem;color:var(--t3);margin-top:4px}
+  .wizard button{margin-top:24px;padding:14px 28px;background:var(--accent);color:#fff;border:2px solid var(--accent);font-size:1.1rem;font-weight:700;cursor:pointer;text-transform:uppercase}
+  .wizard button:hover{background:#1e3a8a}
+  .wizard .err{background:#fee2e2;border:2px solid var(--danger);padding:12px;color:var(--danger);margin-top:14px;display:none;font-weight:600}
+  .wizard .ok-msg{background:#dcfce7;border:2px solid var(--on);padding:12px;color:var(--on);margin-top:14px;display:none;font-weight:600}
+  .wizard ol{margin:14px 0 14px 24px;color:var(--t2)}
+  .wizard ol li{margin-bottom:8px}
+  .wizard code{background:var(--bg2);padding:2px 8px;border:1px solid var(--brd2);font-family:monospace;font-size:0.9rem}
+  .wizard .step{background:var(--bg2);border-left:5px solid var(--accent);padding:14px 18px;margin:14px 0}
+  .reset-btn{font-size:0.85rem;padding:8px 16px;background:var(--bg2);color:var(--t2);border:2px solid var(--brd);cursor:pointer;font-weight:600}
+  .reset-btn:hover{background:var(--bg1);color:var(--t1)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+// ════════════════════════════════════════
+// MARSTEK VENUS E – ZELLEN MONITOR
+// Standalone-Version für die Community
+// ════════════════════════════════════════
+
+const STORAGE_KEY = 'marstek_zellen_config';
+const LANG_KEY = 'marstek_zellen_lang';
+let cfg = null;
+let ws = null, mid = 1, cbs = {};
+let chCells = null, chHist = null, chDelta = null;
+const S = { connected: false, cells: new Array(16).fill(0), soc: 0, battTemp: 0, invState: '–' };
+
+// ════════════════════════════════════════
+// i18n
+// ════════════════════════════════════════
+const I18N = {
+  de: {
+    title: '🔋 Marstek Venus E – Zellen-Monitor',
+    intro: 'Live-Überwachung aller 16 Zellspannungen deines Marstek Venus E LiFePO4-Speichers über Home Assistant.',
+    language: 'Sprache / Language',
+    prereq: 'Voraussetzungen:',
+    prereq_1: 'Marstek Venus E (v1/v2 oder v3)',
+    prereq_2: 'Modbus TCP Verbindung zur Batterie:',
+    prereq_2_v3: '<strong>Venus E v3:</strong> Direkt per Ethernet-Kabel am LAN-Port (kein Adapter nötig)',
+    prereq_2_v12: '<strong>Venus E v1/v2:</strong> RS485-zu-WiFi/Ethernet Gateway (z.B. Elfin EW11, PUSR DR134, Waveshare RS485-RJ45) am RS485-Port der Batterie',
+    prereq_3: 'Home Assistant Core 2025.9 oder neuer',
+    prereq_4: 'Das <a href="https://github.com/ViperRNMC/marstek_venus_modbus" target="_blank">Marstek Venus Modbus Plugin</a> via HACS installiert und konfiguriert',
+    prereq_5: 'Die 16 Zellsensoren müssen in HA aktiviert sein (sind standardmäßig deaktiviert)',
+    enable: 'Zellsensoren aktivieren:',
+    enable_1: 'HA → Einstellungen → Geräte & Dienste → Marstek Venus Modbus → Entitäten',
+    enable_2: 'Suche nach <code>zelle</code> – du findest 16 deaktivierte Sensoren',
+    enable_3: 'Alle aktivieren (Mehrfachauswahl möglich)',
+    enable_4: 'Polling-Intervall (Plugin-Optionen): "Low Priority" auf 300 Sekunden setzen',
+    token_hdr: 'Long-Lived Access Token erstellen:',
+    token_1: 'HA öffnen → Klick auf dein Profil unten links',
+    token_2: 'Tab "Sicherheit" → ganz unten "Long-lived access tokens" → "Token erstellen"',
+    token_3: 'Name vergeben, Token kopieren (wird nur einmal gezeigt!)',
+    ha_url: 'Home Assistant URL',
+    ha_url_hint: 'Inkl. http:// oder https:// und Port. Beispiel: <code>http://homeassistant.local:8123</code>',
+    ha_token: 'Long-Lived Access Token',
+    ha_token_hint: 'Wird nur lokal in deinem Browser gespeichert (localStorage). Keine Übertragung an Dritte.',
+    ha_prefix: 'Sensor-Präfix der Zellen (optional)',
+    ha_prefix_hint: 'Standard sollte für die meisten passen. Format: <code>{prefix}{1-16}_spannung</code>',
+    connect_btn: 'Verbinden & Speichern',
+    privacy_hdr: 'Hinweise zum Datenschutz:',
+    privacy: 'Token und URL werden ausschließlich im localStorage deines Browsers gespeichert. Keine externen Server, keine Cloud, keine Telemetrie. Die HTML-Datei kann komplett offline genutzt werden.',
+    err_url: 'URL muss mit http:// oder https:// beginnen',
+    err_token: 'Token sieht zu kurz aus – das sollte ein langer JWT-String sein',
+    testing: 'Teste Verbindung...',
+    ok_connected: '✓ Verbindung erfolgreich! Dashboard wird geladen...',
+    err_token_invalid: 'Token ungültig – bitte prüfen',
+    err_connect: 'Verbindung fehlgeschlagen – URL prüfen, HA erreichbar? CORS bei https→ws problematisch?',
+    setup_btn: '⚙ Setup',
+    confirm_reset: 'Konfiguration löschen und neu einrichten?',
+    sec_bms: 'BMS Übersicht',
+    lbl_pack: 'Pack-Spannung',
+    lbl_avg: 'Ø Zellspannung',
+    lbl_delta: 'Delta Min↔Max',
+    lbl_stdev: 'σ Streuung',
+    sub_stdev: 'Standardabw.',
+    lbl_min: 'Min Zelle',
+    lbl_max: 'Max Zelle',
+    lbl_status: 'Status',
+    lbl_balancing: 'Balancing',
+    sec_cells: 'Zellspannungen (alle 16)',
+    cells_legend: 'Petrol = optimal · Bernstein = abweichend · Rot = kritisch',
+    sec_hist: 'Verlauf 24h – Min/Max/Ø',
+    sec_delta: 'Delta-Verlauf 24h',
+    sec_health: '🏥 Pack-Gesundheit',
+    sec_table: '📋 Detailtabelle',
+    col_cell: 'Zelle', col_volt: 'Spannung', col_dev: 'Δ vom Mittel', col_eval: 'Bewertung',
+    sec_thresholds: 'ℹ️ LiFePO4 Schwellenwerte',
+    th_deep: 'Tiefentladung kritisch',
+    th_disch: 'Entladen normal',
+    th_charge: 'Laden normal',
+    th_full: 'Vollladung',
+    th_over: 'Überladung kritisch',
+    th_delta_ok: 'Delta gut',
+    th_delta_warn: 'Delta Warnung',
+    th_delta_crit: 'Delta kritisch',
+    th_delta_crit_v: '&gt; 50 mV (Balancing nötig)',
+    cells_of: 'Zellen',
+    status_full: 'Voll', status_charge: 'Laden', status_discharge: 'Entladen', status_low: 'Tief',
+    delta_ok: 'Optimal balanciert', delta_warn: 'Erhöht – beobachten', delta_crit: 'Kritisch – Balancing nötig',
+    st_ok: 'OK', st_warn: 'WARNUNG', st_crit: 'KRITISCH',
+    st_ok_sub: 'Alle Zellen im Normbereich', st_warn_sub: 'Beobachtung empfohlen', st_crit_sub: 'Außerhalb Sicherheitsgrenzen!',
+    health_prefix: 'Health-Score',
+    health_excellent: 'Hervorragend', health_good: 'Gut', health_ok: 'Akzeptabel', health_watch: 'Beobachten', health_bad: 'Kritisch – Service nötig',
+    eval_ok: 'Optimal', eval_mild: 'Leicht abweichend', eval_strong: 'Stark abweichend', eval_unsafe: 'Außerhalb Sicherheit!',
+    active: 'aktiv', cell_short: 'Z',
+    locale: 'de-DE'
+  },
+  en: {
+    title: '🔋 Marstek Venus E – Cell Monitor',
+    intro: 'Live monitoring of all 16 cell voltages of your Marstek Venus E LiFePO4 battery via Home Assistant.',
+    language: 'Language / Sprache',
+    prereq: 'Requirements:',
+    prereq_1: 'Marstek Venus E (v1/v2 or v3)',
+    prereq_2: 'Modbus TCP connection to the battery:',
+    prereq_2_v3: '<strong>Venus E v3:</strong> Directly via Ethernet cable at the LAN port (no adapter needed)',
+    prereq_2_v12: '<strong>Venus E v1/v2:</strong> RS485-to-WiFi/Ethernet gateway (e.g. Elfin EW11, PUSR DR134, Waveshare RS485-RJ45) at the RS485 port of the battery',
+    prereq_3: 'Home Assistant Core 2025.9 or newer',
+    prereq_4: 'The <a href="https://github.com/ViperRNMC/marstek_venus_modbus" target="_blank">Marstek Venus Modbus plugin</a> installed and configured via HACS',
+    prereq_5: 'The 16 cell sensors must be enabled in HA (they are disabled by default)',
+    enable: 'Enable cell sensors:',
+    enable_1: 'HA → Settings → Devices & Services → Marstek Venus Modbus → Entities',
+    enable_2: 'Search for <code>zelle</code> – you will find 16 disabled sensors',
+    enable_3: 'Enable all of them (multi-select supported)',
+    enable_4: 'Polling interval (plugin options): set "Low Priority" to 300 seconds',
+    token_hdr: 'Create a Long-Lived Access Token:',
+    token_1: 'Open HA → click your profile in the bottom left',
+    token_2: 'Tab "Security" → at the bottom "Long-lived access tokens" → "Create token"',
+    token_3: 'Choose a name, copy the token (shown only once!)',
+    ha_url: 'Home Assistant URL',
+    ha_url_hint: 'Including http:// or https:// and port. Example: <code>http://homeassistant.local:8123</code>',
+    ha_token: 'Long-Lived Access Token',
+    ha_token_hint: 'Stored only locally in your browser (localStorage). No data sent to third parties.',
+    ha_prefix: 'Cell sensor prefix (optional)',
+    ha_prefix_hint: 'Default should work for most setups. Format: <code>{prefix}{1-16}_spannung</code>',
+    connect_btn: 'Connect & Save',
+    privacy_hdr: 'Privacy notes:',
+    privacy: 'Token and URL are stored exclusively in your browser localStorage. No external servers, no cloud, no telemetry. The HTML file can be used completely offline.',
+    err_url: 'URL must start with http:// or https://',
+    err_token: 'Token looks too short – should be a long JWT string',
+    testing: 'Testing connection...',
+    ok_connected: '✓ Connection successful! Loading dashboard...',
+    err_token_invalid: 'Invalid token – please check',
+    err_connect: 'Connection failed – check URL, is HA reachable? CORS issues with https→ws?',
+    setup_btn: '⚙ Setup',
+    confirm_reset: 'Delete configuration and re-run setup?',
+    sec_bms: 'BMS Overview',
+    lbl_pack: 'Pack Voltage',
+    lbl_avg: 'Avg Cell Voltage',
+    lbl_delta: 'Delta Min↔Max',
+    lbl_stdev: 'σ Spread',
+    sub_stdev: 'Std. deviation',
+    lbl_min: 'Min Cell',
+    lbl_max: 'Max Cell',
+    lbl_status: 'Status',
+    lbl_balancing: 'Balancing',
+    sec_cells: 'Cell Voltages (all 16)',
+    cells_legend: 'Petrol = optimal · Amber = deviating · Red = critical',
+    sec_hist: '24h History – Min/Max/Avg',
+    sec_delta: '24h Delta History',
+    sec_health: '🏥 Pack Health',
+    sec_table: '📋 Detail Table',
+    col_cell: 'Cell', col_volt: 'Voltage', col_dev: 'Δ from mean', col_eval: 'Rating',
+    sec_thresholds: 'ℹ️ LiFePO4 Thresholds',
+    th_deep: 'Deep discharge critical',
+    th_disch: 'Discharge normal',
+    th_charge: 'Charge normal',
+    th_full: 'Fully charged',
+    th_over: 'Overcharge critical',
+    th_delta_ok: 'Delta good',
+    th_delta_warn: 'Delta warning',
+    th_delta_crit: 'Delta critical',
+    th_delta_crit_v: '&gt; 50 mV (balancing needed)',
+    cells_of: 'cells',
+    status_full: 'Full', status_charge: 'Charging', status_discharge: 'Discharging', status_low: 'Low',
+    delta_ok: 'Optimally balanced', delta_warn: 'Elevated – monitor', delta_crit: 'Critical – balancing needed',
+    st_ok: 'OK', st_warn: 'WARNING', st_crit: 'CRITICAL',
+    st_ok_sub: 'All cells within nominal range', st_warn_sub: 'Monitoring recommended', st_crit_sub: 'Outside safety limits!',
+    health_prefix: 'Health score',
+    health_excellent: 'Excellent', health_good: 'Good', health_ok: 'Acceptable', health_watch: 'Monitor', health_bad: 'Critical – service required',
+    eval_ok: 'Optimal', eval_mild: 'Slightly deviating', eval_strong: 'Strongly deviating', eval_unsafe: 'Outside safety!',
+    active: 'active', cell_short: 'C',
+    locale: 'en-US'
+  }
+};
+let LANG = localStorage.getItem(LANG_KEY) || 'de';
+if (!I18N[LANG]) LANG = 'de';
+function t(k) { return I18N[LANG][k] ?? I18N.de[k] ?? k; }
+function setLang(l) { if (!I18N[l]) return; LANG = l; localStorage.setItem(LANG_KEY, l); if (cfg && cfg.url && cfg.token) showDashboard(); else showWizard(); }
+
+function loadConfig() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch { return null; }
+}
+function saveConfig(c) { localStorage.setItem(STORAGE_KEY, JSON.stringify(c)); }
+function clearConfig() { localStorage.removeItem(STORAGE_KEY); location.reload(); }
+
+// ════════════════════════════════════════
+// SETUP WIZARD
+// ════════════════════════════════════════
+function showWizard() {
+  document.getElementById('app').innerHTML = `
+    <div class="wizard">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <label style="display:inline-flex;align-items:center;gap:8px;margin:0;font-size:0.85rem;font-weight:600;color:var(--t2)">
+          ${t('language')}
+          <select id="lang_sel" onchange="setLang(this.value)" style="padding:6px 10px;border:2px solid var(--brd);background:var(--bg2);font-family:Arial;font-size:0.9rem;font-weight:600">
+            <option value="de"${LANG==='de'?' selected':''}>Deutsch</option>
+            <option value="en"${LANG==='en'?' selected':''}>English</option>
+          </select>
+        </label>
+      </div>
+      <h2>${t('title')}</h2>
+      <p>${t('intro')}</p>
+
+      <div class="step">
+        <strong>${t('prereq')}</strong>
+        <ol>
+          <li>${t('prereq_1')}</li>
+          <li>${t('prereq_2')}
+            <ul style="margin-top:6px;margin-left:18px">
+              <li>${t('prereq_2_v3')}</li>
+              <li>${t('prereq_2_v12')}</li>
+            </ul>
+          </li>
+          <li>${t('prereq_3')}</li>
+          <li>${t('prereq_4')}</li>
+          <li>${t('prereq_5')}</li>
+        </ol>
+      </div>
+
+      <div class="step">
+        <strong>${t('enable')}</strong>
+        <ol>
+          <li>${t('enable_1')}</li>
+          <li>${t('enable_2')}</li>
+          <li>${t('enable_3')}</li>
+          <li>${t('enable_4')}</li>
+        </ol>
+      </div>
+
+      <div class="step">
+        <strong>${t('token_hdr')}</strong>
+        <ol>
+          <li>${t('token_1')}</li>
+          <li>${t('token_2')}</li>
+          <li>${t('token_3')}</li>
+        </ol>
+      </div>
+
+      <label>${t('ha_url')}</label>
+      <input type="text" id="ha_url" placeholder="http://192.168.1.100:8123" value="${cfg?.url || ''}">
+      <div class="hint">${t('ha_url_hint')}</div>
+
+      <label>${t('ha_token')}</label>
+      <input type="password" id="ha_token" placeholder="eyJhbGciOiJIUzI1NiIs..." value="${cfg?.token || ''}">
+      <div class="hint">${t('ha_token_hint')}</div>
+
+      <label>${t('ha_prefix')}</label>
+      <input type="text" id="ha_prefix" placeholder="sensor.marstek_venus_modbus_batteriepack_1_zelle_" value="${cfg?.prefix || 'sensor.marstek_venus_modbus_batteriepack_1_zelle_'}">
+      <div class="hint">${t('ha_prefix_hint')}</div>
+
+      <button onclick="testAndSave()">${t('connect_btn')}</button>
+      <div id="setup_err" class="err"></div>
+      <div id="setup_ok" class="ok-msg"></div>
+
+      <div style="margin-top:30px;padding-top:20px;border-top:1px solid var(--brd2);font-size:0.85rem;color:var(--t3)">
+        <strong>${t('privacy_hdr')}</strong> ${t('privacy')}
+      </div>
+    </div>
+  `;
+}
+
+function testAndSave() {
+  const url = document.getElementById('ha_url').value.trim().replace(/\/$/, '');
+  const token = document.getElementById('ha_token').value.trim();
+  const prefix = document.getElementById('ha_prefix').value.trim() || 'sensor.marstek_venus_modbus_batteriepack_1_zelle_';
+  const err = document.getElementById('setup_err');
+  const ok = document.getElementById('setup_ok');
+  err.style.display = 'none'; ok.style.display = 'none';
+
+  if (!url.startsWith('http')) { err.textContent = t('err_url'); err.style.display = 'block'; return; }
+  if (token.length < 50) { err.textContent = t('err_token'); err.style.display = 'block'; return; }
+
+  const wsUrl = url.replace(/^http/, 'ws') + '/api/websocket';
+  ok.textContent = t('testing'); ok.style.display = 'block';
+
+  const testWs = new WebSocket(wsUrl);
+  let authed = false;
+  testWs.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'auth_required') testWs.send(JSON.stringify({ type: 'auth', access_token: token }));
+    if (m.type === 'auth_ok') {
+      authed = true;
+      ok.textContent = t('ok_connected');
+      saveConfig({ url, token, prefix });
+      cfg = { url, token, prefix };
+      testWs.close();
+      setTimeout(() => location.reload(), 1000);
+    }
+    if (m.type === 'auth_invalid') {
+      err.textContent = t('err_token_invalid');
+      err.style.display = 'block'; ok.style.display = 'none';
+      testWs.close();
+    }
+  };
+  testWs.onerror = () => {
+    if (!authed) {
+      err.textContent = t('err_connect');
+      err.style.display = 'block'; ok.style.display = 'none';
+    }
+  };
+  setTimeout(() => { if (!authed) { try { testWs.close(); } catch {} } }, 5000);
+}
+
+// ════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════
+function showDashboard() {
+  document.getElementById('app').innerHTML = `
+    <div class="dash">
+      <div class="hdr">
+        <h1>${t('title')}</h1>
+        <div class="hdr-r">
+          <select id="lang_sel" onchange="setLang(this.value)" style="padding:6px 10px;border:2px solid var(--brd);background:var(--bg2);font-family:Arial;font-size:0.85rem;font-weight:600">
+            <option value="de"${LANG==='de'?' selected':''}>DE</option>
+            <option value="en"${LANG==='en'?' selected':''}>EN</option>
+          </select>
+          <div class="conn" id="conn"></div>
+          <span class="t" id="clock"></span>
+          <button class="reset-btn" onclick="if(confirm(t('confirm_reset')))clearConfig()">${t('setup_btn')}</button>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-t">${t('sec_bms')}</div>
+        <div class="row r4">
+          <div class="c"><div class="lbl">${t('lbl_pack')}</div><div class="val big" style="color:var(--batt)"><span id="z_total">–</span><span class="u"> V</span></div><div class="sub" id="z_total_sub">–</div></div>
+          <div class="c"><div class="lbl">${t('lbl_avg')}</div><div class="val big" style="color:var(--batt)"><span id="z_avg">–</span><span class="u"> V</span></div><div class="sub" id="z_avg_sub">–</div></div>
+          <div class="c"><div class="lbl">${t('lbl_delta')}</div><div class="val big" id="z_delta">–<span class="u"> mV</span></div><div class="sub" id="z_delta_sub">${t('lbl_balancing')}</div></div>
+          <div class="c"><div class="lbl">${t('lbl_stdev')}</div><div class="val big" style="color:var(--haus)"><span id="z_stdev">–</span><span class="u"> mV</span></div><div class="sub">${t('sub_stdev')}</div></div>
+        </div>
+        <div class="row r3">
+          <div class="c"><div class="lbl">${t('lbl_min')}</div><div class="val" style="color:var(--danger)"><span id="z_min">–</span><span class="u"> V</span></div><div class="sub" id="z_min_sub">–</div></div>
+          <div class="c"><div class="lbl">${t('lbl_max')}</div><div class="val" style="color:var(--on)"><span id="z_max">–</span><span class="u"> V</span></div><div class="sub" id="z_max_sub">–</div></div>
+          <div class="c"><div class="lbl">${t('lbl_status')}</div><div class="val" id="z_status">–</div><div class="sub" id="z_status_sub">–</div></div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-t">${t('sec_cells')}</div>
+        <div class="cw"><canvas id="z_chart_cells"></canvas></div>
+        <div class="sub" style="text-align:center;margin-top:8px">${t('cells_legend')}</div>
+      </div>
+
+      <div class="sec"><div class="sec-t">${t('sec_hist')}</div>
+        <div class="cw" style="height:280px"><canvas id="z_chart_hist"></canvas></div>
+      </div>
+
+      <div class="sec"><div class="sec-t">${t('sec_delta')}</div>
+        <div class="cw" style="height:240px"><canvas id="z_chart_delta"></canvas></div>
+      </div>
+
+      <div class="sec"><div class="sec-t">${t('sec_health')}</div>
+        <div id="cell_health" class="comfort ok">–</div>
+      </div>
+
+      <div class="sec"><div class="sec-t">${t('sec_table')}</div>
+        <table class="info-tbl">
+          <thead><tr><td>${t('col_cell')}</td><td>${t('col_volt')}</td><td>${t('col_dev')}</td><td>${t('col_eval')}</td></tr></thead>
+          <tbody id="cell_table_body"></tbody>
+        </table>
+      </div>
+
+      <div class="sec"><div class="sec-t">${t('sec_thresholds')}</div>
+        <table class="info-tbl">
+          <tr><td>${t('th_deep')}</td><td>&lt; 2.50 V</td></tr>
+          <tr><td>${t('th_disch')}</td><td>3.00–3.20 V</td></tr>
+          <tr><td>${t('th_charge')}</td><td>3.30–3.40 V</td></tr>
+          <tr><td>${t('th_full')}</td><td>3.40–3.50 V</td></tr>
+          <tr><td>${t('th_over')}</td><td>&gt; 3.65 V</td></tr>
+          <tr><td>${t('th_delta_ok')}</td><td>&lt; 20 mV</td></tr>
+          <tr><td>${t('th_delta_warn')}</td><td>20–50 mV</td></tr>
+          <tr><td>${t('th_delta_crit')}</td><td>${t('th_delta_crit_v')}</td></tr>
+        </table>
+      </div>
+    </div>
+  `;
+  setInterval(() => { const c = document.getElementById('clock'); if (c) c.textContent = new Date().toLocaleTimeString(t('locale')); }, 1000);
+  connect();
+}
+
+// ════════════════════════════════════════
+// WEBSOCKET
+// ════════════════════════════════════════
+function connect() {
+  const wsUrl = cfg.url.replace(/^http/, 'ws') + '/api/websocket';
+  ws = new WebSocket(wsUrl);
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'auth_required') ws.send(JSON.stringify({ type: 'auth', access_token: cfg.token }));
+    if (m.type === 'auth_ok') { S.connected = true; updateConn(); subscribe(); loadHistory(); }
+    if (m.type === 'event' && m.event?.data?.new_state) handleState(m.event.data.new_state);
+    if (m.type === 'result') { if (cbs[m.id]) { cbs[m.id](m.result); delete cbs[m.id]; } else if (Array.isArray(m.result)) m.result.forEach(handleState); }
+  };
+  ws.onclose = () => { S.connected = false; updateConn(); setTimeout(connect, 5000); };
+  ws.onerror = () => ws.close();
+}
+function send(msg, cb) { const id = mid++; msg.id = id; if (cb) cbs[id] = cb; ws.send(JSON.stringify(msg)); }
+function subscribe() { send({ type: 'subscribe_events', event_type: 'state_changed' }); send({ type: 'get_states' }); }
+function updateConn() { const d = document.getElementById('conn'); if (d) d.className = 'conn ' + (S.connected ? 'ok' : ''); }
+
+function handleState(s) {
+  const eid = s.entity_id, val = parseFloat(s.state);
+  const m = eid.match(new RegExp(cfg.prefix.replace(/\./g, '\\.') + '(\\d+)_spannung'));
+  if (m) { const idx = parseInt(m[1]) - 1; if (idx >= 0 && idx < 16) { S.cells[idx] = isNaN(val) ? 0 : val; renderCells(); } return; }
+  if (eid === 'sensor.marstek_venus_modbus_soc_batterie') S.soc = isNaN(val) ? 0 : val;
+  if (eid === 'sensor.marstek_venus_modbus_innentemperatur') S.battTemp = isNaN(val) ? 0 : val;
+  if (eid === 'sensor.marstek_venus_modbus_wechselrichter_status') S.invState = s.state;
+}
+
+// ════════════════════════════════════════
+// HISTORY
+// ════════════════════════════════════════
+function loadHistory() {
+  initCharts();
+  const now = new Date(), start = new Date(now - 24 * 36e5);
+  const ids = [];
+  for (let i = 1; i <= 16; i++) ids.push(cfg.prefix + i + '_spannung');
+  send({ type: 'recorder/statistics_during_period', start_time: start.toISOString(), end_time: now.toISOString(), statistic_ids: ids, period: '5minute', types: ['mean'] }, (res) => {
+    if (!res) return;
+    const find = (eid) => { if (res[eid]) return res[eid]; const s = eid.split('.').pop(); for (const k of Object.keys(res)) if (k.includes(s)) return res[k]; return []; };
+    const arrs = ids.map(id => find(id));
+    const len = Math.min(...arrs.map(a => a.length));
+    if (len === 0) return;
+    const histMax = [], histMin = [], histAvg = [], histDelta = [];
+    for (let i = 0; i < len; i++) {
+      const vals = arrs.map(a => a[i]?.mean).filter(v => v != null && v > 0);
+      if (vals.length === 0) continue;
+      const ts = typeof arrs[0][i].start === 'number' ? arrs[0][i].start : new Date(arrs[0][i].start).getTime();
+      const mn = Math.min(...vals), mx = Math.max(...vals), av = vals.reduce((a, b) => a + b, 0) / vals.length;
+      histMax.push({ x: ts, y: mx }); histMin.push({ x: ts, y: mn }); histAvg.push({ x: ts, y: av });
+      histDelta.push({ x: ts, y: (mx - mn) * 1000 });
+    }
+    if (chHist) { chHist.data.datasets[0].data = histMax; chHist.data.datasets[1].data = histAvg; chHist.data.datasets[2].data = histMin; chHist.update(); }
+    if (chDelta) { chDelta.data.datasets[0].data = histDelta; chDelta.update(); }
+  });
+}
+
+// ════════════════════════════════════════
+// CHARTS
+// ════════════════════════════════════════
+function initCharts() {
+  if (chCells) return;
+  const F = { family: 'Arial', size: 13, weight: '600' };
+  const G = { color: '#d1d5db' };
+  const T = { color: '#111827', font: F };
+  const TT = { backgroundColor: '#fff', borderColor: '#111827', borderWidth: 2, titleColor: '#111827', bodyColor: '#111827', titleFont: { family: 'Arial', size: 14, weight: '700' }, bodyFont: { family: 'Arial', size: 13 }, padding: 12, cornerRadius: 0 };
+
+  chCells = new Chart(document.getElementById('z_chart_cells').getContext('2d'), {
+    type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderColor: '#111827', borderWidth: 2 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+      plugins: { legend: { display: false }, tooltip: { ...TT, callbacks: { label: c => ' ' + c.parsed.y.toFixed(3) + ' V' } } },
+      scales: { x: { grid: G, ticks: T }, y: { grid: G, ticks: T, title: { display: true, text: LANG==='en'?'Voltage (V)':'Spannung (V)', color: '#111827', font: { family: 'Arial', size: 14, weight: '700' } } } }
+    }
+  });
+
+  chHist = new Chart(document.getElementById('z_chart_hist').getContext('2d'), {
+    type: 'line', data: { datasets: [
+      { label: LANG==='en'?'Max':'Max', data: [], borderColor: '#15803d', borderWidth: 3, tension: .3, pointRadius: 0, fill: false },
+      { label: LANG==='en'?'Avg':'Mittel', data: [], borderColor: '#1d4ed8', borderWidth: 3, tension: .3, pointRadius: 0, fill: false },
+      { label: LANG==='en'?'Min':'Min', data: [], borderColor: '#b91c1c', borderWidth: 3, tension: .3, pointRadius: 0, fill: false }
+    ] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+      plugins: { legend: { display: true, labels: { color: '#111827', font: F, padding: 10 } }, tooltip: { ...TT, callbacks: { title: i => i.length ? new Date(i[0].parsed.x).toLocaleTimeString(t('locale'), { hour: '2-digit', minute: '2-digit' }) : '', label: c => ' ' + c.dataset.label + ': ' + c.parsed.y.toFixed(3) + ' V' } } },
+      scales: { x: { type: 'linear', grid: G, ticks: { ...T, maxTicksLimit: 12, callback: function (v) { const d = new Date(v); return isNaN(d) ? '' : d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0'); } } }, y: { grid: G, ticks: T, title: { display: true, text: 'V', color: '#111827', font: { family: 'Arial', size: 14, weight: '700' } } } }
+    }
+  });
+
+  chDelta = new Chart(document.getElementById('z_chart_delta').getContext('2d'), {
+    type: 'line', data: { datasets: [{ label: 'Delta', data: [], borderColor: '#c2410c', backgroundColor: '#fed7aa', borderWidth: 3, tension: .3, pointRadius: 0, fill: true }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+      plugins: { legend: { display: false }, tooltip: { ...TT, callbacks: { title: i => i.length ? new Date(i[0].parsed.x).toLocaleTimeString(t('locale'), { hour: '2-digit', minute: '2-digit' }) : '', label: c => ' Δ ' + c.parsed.y.toFixed(0) + ' mV' } } },
+      scales: { x: { type: 'linear', grid: G, ticks: { ...T, maxTicksLimit: 12, callback: function (v) { const d = new Date(v); return isNaN(d) ? '' : d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0'); } } }, y: { grid: G, ticks: T, title: { display: true, text: 'mV', color: '#111827', font: { family: 'Arial', size: 14, weight: '700' } }, beginAtZero: true } }
+    }
+  });
+}
+
+function cellColor(v, vmin, vmax) {
+  if (v < 2.7 || v > 3.55) return '#b91c1c';
+  if (v < 2.9 || v > 3.5) return '#c2410c';
+  const dev = Math.abs(v - ((vmin + vmax) / 2));
+  if (dev > 0.030) return '#a16207';
+  if (dev > 0.015) return '#15803d';
+  return '#0e7490';
+}
+
+function renderCells() {
+  initCharts();
+  const $ = id => document.getElementById(id);
+  if (!$('z_total')) return;
+  const cells = S.cells.filter(v => v > 0);
+  if (cells.length === 0) return;
+  const sum = cells.reduce((a, b) => a + b, 0);
+  const avg = sum / cells.length;
+  const min = Math.min(...cells), max = Math.max(...cells);
+  const minIdx = S.cells.indexOf(min) + 1, maxIdx = S.cells.indexOf(max) + 1;
+  const delta = (max - min) * 1000;
+  const stdev = Math.sqrt(cells.reduce((a, v) => a + (v - avg) ** 2, 0) / cells.length) * 1000;
+
+  $('z_total').textContent = sum.toFixed(2);
+  $('z_total_sub').textContent = cells.length + '/16 ' + t('cells_of');
+  $('z_avg').textContent = avg.toFixed(3);
+  let stat = t('status_discharge'); if (avg > 3.45) stat = t('status_full'); else if (avg > 3.30) stat = t('status_charge'); else if (avg < 2.9) stat = t('status_low');
+  $('z_avg_sub').textContent = stat;
+  $('z_delta').textContent = delta.toFixed(0);
+  let dCol = 'var(--on)', dLbl = t('delta_ok');
+  if (delta > 50) { dCol = 'var(--danger)'; dLbl = t('delta_crit'); }
+  else if (delta > 20) { dCol = 'var(--warn)'; dLbl = t('delta_warn'); }
+  $('z_delta').style.color = dCol; $('z_delta_sub').textContent = dLbl;
+  $('z_stdev').textContent = stdev.toFixed(1);
+  $('z_min').textContent = min.toFixed(3); $('z_min_sub').textContent = t('col_cell') + ' ' + minIdx;
+  $('z_max').textContent = max.toFixed(3); $('z_max_sub').textContent = t('col_cell') + ' ' + maxIdx;
+
+  let zSt = t('st_ok'), zCol = 'var(--on)', zSub = t('st_ok_sub');
+  if (min < 2.7 || max > 3.55) { zSt = t('st_crit'); zCol = 'var(--danger)'; zSub = t('st_crit_sub'); }
+  else if (min < 2.9 || max > 3.5 || delta > 50) { zSt = t('st_warn'); zCol = 'var(--warn)'; zSub = t('st_warn_sub'); }
+  $('z_status').textContent = zSt; $('z_status').style.color = zCol; $('z_status_sub').textContent = zSub;
+
+  // Bar chart
+  chCells.data.labels = S.cells.map((_, i) => t('cell_short') + (i + 1));
+  chCells.data.datasets[0].data = S.cells.map(v => v > 0 ? +v.toFixed(3) : null);
+  chCells.data.datasets[0].backgroundColor = S.cells.map(v => v > 0 ? cellColor(v, min, max) : '#e5e7eb');
+  const padding = Math.max(0.05, (max - min) * 2);
+  chCells.options.scales.y.suggestedMin = Math.max(2.5, min - padding);
+  chCells.options.scales.y.suggestedMax = Math.min(3.65, max + padding);
+  chCells.update('none');
+
+  // Health Score
+  let score = 100;
+  if (delta > 20) score -= Math.min(50, (delta - 20));
+  if (stdev > 10) score -= Math.min(30, (stdev - 10) * 2);
+  if (min < 2.9 || max > 3.5) score -= 20;
+  if (min < 2.7 || max > 3.55) score -= 30;
+  score = Math.max(0, Math.round(score));
+  let hLbl = t('health_excellent'), hCls = 'ok';
+  if (score < 90) { hLbl = t('health_good'); hCls = 'ok'; }
+  if (score < 75) { hLbl = t('health_ok'); hCls = 'warn'; }
+  if (score < 60) { hLbl = t('health_watch'); hCls = 'warn'; }
+  if (score < 40) { hLbl = t('health_bad'); hCls = 'bad'; }
+  const hEl = $('cell_health');
+  if (hEl) { hEl.className = 'comfort ' + hCls; hEl.innerHTML = `<strong>${t('health_prefix')}: ${score}/100 – ${hLbl}</strong> · Δ ${delta.toFixed(0)} mV · σ ${stdev.toFixed(1)} mV · ${cells.length}/16 ${t('active')}`; }
+
+  // Detail table
+  if ($('cell_table_body')) {
+    let html = '';
+    S.cells.forEach((v, i) => {
+      if (v <= 0) { html += `<tr><td>${t('cell_short')}${i + 1}</td><td>–</td><td>–</td><td>–</td></tr>`; return; }
+      const dev = (v - avg) * 1000;
+      let evt = t('eval_ok'), col = 'var(--on)';
+      if (Math.abs(dev) > 15) { evt = t('eval_mild'); col = 'var(--warn)'; }
+      if (Math.abs(dev) > 30) { evt = t('eval_strong'); col = 'var(--danger)'; }
+      if (v < 2.8 || v > 3.65) { evt = t('eval_unsafe'); col = 'var(--danger)'; }
+      html += `<tr><td>${t('cell_short')}${i + 1}</td><td>${v.toFixed(3)} V</td><td>${dev >= 0 ? '+' : ''}${dev.toFixed(1)} mV</td><td style="color:${col};font-weight:700">${evt}</td></tr>`;
+    });
+    $('cell_table_body').innerHTML = html;
+  }
+}
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+cfg = loadConfig();
+if (!cfg || !cfg.url || !cfg.token) showWizard();
+else showDashboard();
+</script>
+</body>
+</html>
