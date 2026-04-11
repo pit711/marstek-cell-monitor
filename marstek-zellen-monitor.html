@@ -260,6 +260,7 @@ const I18N = {
     of_word: 'von',
     mode_manual: 'Manuell', mode_anti_feed: 'Nulleinspeisung', mode_trade_mode: 'Handelsmodus',
     edit_mode: 'Bearbeiten',
+    warn_high_power: 'ACHTUNG!\n\nLade- oder Entladeleistungen über 800 W dürfen ausschließlich von einer Elektrofachkraft eingestellt werden.\n\nWirklich fortfahren?',
     locale: 'de-DE'
   },
   en: {
@@ -377,6 +378,7 @@ const I18N = {
     of_word: 'of',
     mode_manual: 'Manual', mode_anti_feed: 'Zero feed-in', mode_trade_mode: 'Trade mode',
     edit_mode: 'Edit',
+    warn_high_power: 'WARNING!\n\nCharge or discharge power above 800 W may only be set by a qualified electrician.\n\nContinue anyway?',
     locale: 'en-US'
   }
 };
@@ -707,9 +709,20 @@ function callService(domain, service, data) {
   if (!S.connected || !ws || ws.readyState !== 1) return;
   send({ type: 'call_service', domain, service, service_data: data });
 }
-function setNum(entity, value) {
+const HIGH_POWER_ENTITIES = {
+  'number.marstek_venus_modbus_maximale_ladeleistung':    'maxCharge',
+  'number.marstek_venus_modbus_maximale_entladeleistung': 'maxDischarge',
+  'number.marstek_venus_modbus_entladeleistung_einstellen':'setDischarge'
+};
+function setNum(entity, value, el) {
   const v = parseFloat(value);
   if (isNaN(v)) return;
+  if (HIGH_POWER_ENTITIES[entity] && v > 800) {
+    if (!confirm(t('warn_high_power'))) {
+      if (el) el.value = S[HIGH_POWER_ENTITIES[entity]] ?? 0;
+      return;
+    }
+  }
   callService('number', 'set_value', { entity_id: entity, value: v });
 }
 function setSelect(entity, option) {
@@ -730,9 +743,9 @@ function renderEditableFields() {
     $('m_mode_wrap').innerHTML = `<select class="edit-select" onchange="setSelect('select.marstek_venus_modbus_benutzer_modus', this.value)">${opts}</select>`;
     const bon = S.backup === 'on';
     $('m_backup_wrap').innerHTML = `<button class="edit-btn${bon?' on':''}" onclick="setSwitch('switch.marstek_venus_modbus_backup_funktion', ${!bon})">${bon?t('yes_l'):t('no_l')}</button>`;
-    $('m_max_chg_wrap').innerHTML = `<input class="edit-input" type="number" min="0" max="2500" step="50" value="${S.maxCharge ?? 0}" onchange="setNum('number.marstek_venus_modbus_maximale_ladeleistung', this.value)"><span class="u"> W</span>`;
-    $('m_max_dchg_wrap').innerHTML = `<input class="edit-input" type="number" min="0" max="2500" step="50" value="${S.maxDischarge ?? 0}" onchange="setNum('number.marstek_venus_modbus_maximale_entladeleistung', this.value)"><span class="u"> W</span>`;
-    $('m_set_dchg_wrap').innerHTML = `<input class="edit-input" type="number" min="0" max="2500" step="50" value="${S.setDischarge ?? 0}" onchange="setNum('number.marstek_venus_modbus_entladeleistung_einstellen', this.value)"><span class="u"> W</span>`;
+    $('m_max_chg_wrap').innerHTML = `<input class="edit-input" type="number" min="0" max="2500" step="50" value="${S.maxCharge ?? 0}" onchange="setNum('number.marstek_venus_modbus_maximale_ladeleistung', this.value, this)"><span class="u"> W</span>`;
+    $('m_max_dchg_wrap').innerHTML = `<input class="edit-input" type="number" min="0" max="2500" step="50" value="${S.maxDischarge ?? 0}" onchange="setNum('number.marstek_venus_modbus_maximale_entladeleistung', this.value, this)"><span class="u"> W</span>`;
+    $('m_set_dchg_wrap').innerHTML = `<input class="edit-input" type="number" min="0" max="2500" step="50" value="${S.setDischarge ?? 0}" onchange="setNum('number.marstek_venus_modbus_entladeleistung_einstellen', this.value, this)"><span class="u"> W</span>`;
   } else {
     $('m_mode_wrap').innerHTML       = `<span id="m_mode">–</span>`;
     $('m_backup_wrap').innerHTML     = `<span id="m_backup">–</span>`;
