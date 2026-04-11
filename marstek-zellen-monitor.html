@@ -65,6 +65,16 @@
   .wizard .step{background:var(--bg2);border-left:5px solid var(--accent);padding:14px 18px;margin:14px 0}
   .reset-btn{font-size:0.85rem;padding:8px 16px;background:var(--bg2);color:var(--t2);border:2px solid var(--brd);cursor:pointer;font-weight:600}
   .reset-btn:hover{background:var(--bg1);color:var(--t1)}
+  .edit-toggle{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:2px solid var(--brd);background:var(--bg2);font-family:Arial;font-size:0.8rem;font-weight:700;color:var(--t2);cursor:pointer;text-transform:uppercase}
+  .edit-toggle.on{border-color:var(--accent);background:#eff6ff;color:var(--accent)}
+  .toggle-sw{width:30px;height:14px;background:var(--brd);border:2px solid var(--t1);position:relative;flex-shrink:0}
+  .toggle-sw::after{content:'';position:absolute;top:-1px;left:-1px;width:12px;height:12px;background:#fff;border:1px solid var(--t1);transition:left .15s}
+  .edit-toggle.on .toggle-sw{background:var(--accent)}
+  .edit-toggle.on .toggle-sw::after{left:17px}
+  .edit-input{width:100%;padding:8px 10px;border:2px solid var(--accent);background:#eff6ff;color:var(--t1);font-family:Arial;font-size:1.5rem;font-weight:700;box-sizing:border-box}
+  .edit-select{width:100%;padding:10px;border:2px solid var(--accent);background:#eff6ff;color:var(--t1);font-family:Arial;font-size:1rem;font-weight:700;box-sizing:border-box;text-transform:none}
+  .edit-btn{padding:10px 18px;border:2px solid var(--accent);background:#eff6ff;color:var(--accent);font-family:Arial;font-size:1rem;font-weight:700;cursor:pointer;text-transform:uppercase}
+  .edit-btn.on{background:var(--on);color:#fff;border-color:var(--on)}
 </style>
 </head>
 <body>
@@ -249,6 +259,7 @@ const I18N = {
     st_charging: 'Lädt', st_discharging: 'Entlädt', st_idle: 'Standby',
     of_word: 'von',
     mode_manual: 'Manuell', mode_anti_feed: 'Nulleinspeisung', mode_trade_mode: 'Handelsmodus',
+    edit_mode: 'Bearbeiten',
     locale: 'de-DE'
   },
   en: {
@@ -365,6 +376,7 @@ const I18N = {
     st_charging: 'Charging', st_discharging: 'Discharging', st_idle: 'Idle',
     of_word: 'of',
     mode_manual: 'Manual', mode_anti_feed: 'Zero feed-in', mode_trade_mode: 'Trade mode',
+    edit_mode: 'Edit',
     locale: 'en-US'
   }
 };
@@ -506,6 +518,7 @@ function showDashboard() {
       <div class="hdr">
         <h1>${t('title')}</h1>
         <div class="hdr-r">
+          <button class="edit-toggle${editMode?' on':''}" id="edit_toggle" onclick="toggleEdit()"><span class="toggle-sw"></span><span>${t('edit_mode')}</span></button>
           <select id="lang_sel" onchange="setLang(this.value)" style="padding:6px 10px;border:2px solid var(--brd);background:var(--bg2);font-family:Arial;font-size:0.85rem;font-weight:600">
             <option value="de"${LANG==='de'?' selected':''}>DE</option>
             <option value="en"${LANG==='en'?' selected':''}>EN</option>
@@ -526,8 +539,8 @@ function showDashboard() {
         <div class="row r4">
           <div class="c"><div class="lbl">${t('lbl_stored')}</div><div class="val big" style="color:var(--batt)"><span id="m_stored">–</span><span class="u"> kWh</span></div><div class="sub" id="m_stored_sub">–</div></div>
           <div class="c"><div class="lbl">${t('lbl_temp')}</div><div class="val big"><span id="m_temp">–</span><span class="u"> °C</span></div><div class="sub">&nbsp;</div></div>
-          <div class="c"><div class="lbl">${t('lbl_user_mode')}</div><div class="val" id="m_mode">–</div><div class="sub">&nbsp;</div></div>
-          <div class="c"><div class="lbl">${t('lbl_backup')}</div><div class="val" id="m_backup">–</div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_user_mode')}</div><div class="val" id="m_mode_wrap"><span id="m_mode">–</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_backup')}</div><div class="val" id="m_backup_wrap"><span id="m_backup">–</span></div><div class="sub">&nbsp;</div></div>
         </div>
       </div>
 
@@ -608,9 +621,9 @@ function showDashboard() {
 
       <div class="sec"><div class="sec-t">${t('sec_opmode')}</div>
         <div class="row r3">
-          <div class="c"><div class="lbl">${t('lbl_max_charge')}</div><div class="val"><span id="m_max_chg">–</span><span class="u"> W</span></div><div class="sub">&nbsp;</div></div>
-          <div class="c"><div class="lbl">${t('lbl_max_discharge')}</div><div class="val"><span id="m_max_dchg">–</span><span class="u"> W</span></div><div class="sub">&nbsp;</div></div>
-          <div class="c"><div class="lbl">${t('lbl_set_discharge')}</div><div class="val"><span id="m_set_dchg">–</span><span class="u"> W</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_max_charge')}</div><div class="val" id="m_max_chg_wrap"><span id="m_max_chg">–</span><span class="u"> W</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_max_discharge')}</div><div class="val" id="m_max_dchg_wrap"><span id="m_max_dchg">–</span><span class="u"> W</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_set_discharge')}</div><div class="val" id="m_set_dchg_wrap"><span id="m_set_dchg">–</span><span class="u"> W</span></div><div class="sub">&nbsp;</div></div>
         </div>
       </div>
 
@@ -680,6 +693,56 @@ function scheduleRender() {
   requestAnimationFrame(() => { _renderPending = false; renderSystem(); });
 }
 
+// ════════════════════════════════════════
+// EDIT MODE — write back to HA
+// ════════════════════════════════════════
+let editMode = false;
+function toggleEdit() {
+  editMode = !editMode;
+  const b = document.getElementById('edit_toggle');
+  if (b) b.classList.toggle('on', editMode);
+  renderEditableFields();
+}
+function callService(domain, service, data) {
+  if (!S.connected || !ws || ws.readyState !== 1) return;
+  send({ type: 'call_service', domain, service, service_data: data });
+}
+function setNum(entity, value) {
+  const v = parseFloat(value);
+  if (isNaN(v)) return;
+  callService('number', 'set_value', { entity_id: entity, value: v });
+}
+function setSelect(entity, option) {
+  callService('select', 'select_option', { entity_id: entity, option: option });
+}
+function setSwitch(entity, on) {
+  callService('switch', on ? 'turn_on' : 'turn_off', { entity_id: entity });
+}
+function renderEditableFields() {
+  const $ = id => document.getElementById(id);
+  if (!$('m_mode_wrap')) return;
+  const fmtInt = v => v == null ? '–' : Math.round(v).toString();
+  if (editMode) {
+    const opts = ['manual','anti_feed','trade_mode'].map(o => {
+      const label = I18N[LANG]['mode_'+o] || o;
+      return `<option value="${o}"${S.userMode===o?' selected':''}>${label}</option>`;
+    }).join('');
+    $('m_mode_wrap').innerHTML = `<select class="edit-select" onchange="setSelect('select.marstek_venus_modbus_benutzer_modus', this.value)">${opts}</select>`;
+    const bon = S.backup === 'on';
+    $('m_backup_wrap').innerHTML = `<button class="edit-btn${bon?' on':''}" onclick="setSwitch('switch.marstek_venus_modbus_backup_funktion', ${!bon})">${bon?t('yes_l'):t('no_l')}</button>`;
+    $('m_max_chg_wrap').innerHTML = `<input class="edit-input" type="number" min="0" max="2500" step="50" value="${S.maxCharge ?? 0}" onchange="setNum('number.marstek_venus_modbus_maximale_ladeleistung', this.value)"><span class="u"> W</span>`;
+    $('m_max_dchg_wrap').innerHTML = `<input class="edit-input" type="number" min="0" max="2500" step="50" value="${S.maxDischarge ?? 0}" onchange="setNum('number.marstek_venus_modbus_maximale_entladeleistung', this.value)"><span class="u"> W</span>`;
+    $('m_set_dchg_wrap').innerHTML = `<input class="edit-input" type="number" min="0" max="2500" step="50" value="${S.setDischarge ?? 0}" onchange="setNum('number.marstek_venus_modbus_entladeleistung_einstellen', this.value)"><span class="u"> W</span>`;
+  } else {
+    $('m_mode_wrap').innerHTML       = `<span id="m_mode">–</span>`;
+    $('m_backup_wrap').innerHTML     = `<span id="m_backup">–</span>`;
+    $('m_max_chg_wrap').innerHTML    = `<span id="m_max_chg">–</span><span class="u"> W</span>`;
+    $('m_max_dchg_wrap').innerHTML   = `<span id="m_max_dchg">–</span><span class="u"> W</span>`;
+    $('m_set_dchg_wrap').innerHTML   = `<span id="m_set_dchg">–</span><span class="u"> W</span>`;
+    renderSystem();
+  }
+}
+
 function renderSystem() {
   const $ = id => document.getElementById(id);
   if (!$('m_soc')) return;
@@ -733,14 +796,18 @@ function renderSystem() {
   // Temperature
   $('m_temp').textContent = fmt(S.temp, 1);
 
-  // User mode (translate known values)
-  const modeKey = 'mode_' + (S.userMode || '');
-  $('m_mode').textContent = (S.userMode && I18N[LANG][modeKey]) ? I18N[LANG][modeKey] : (S.userMode || '–');
+  // User mode (translate known values; skip if in edit mode)
+  if ($('m_mode')) {
+    const modeKey = 'mode_' + (S.userMode || '');
+    $('m_mode').textContent = (S.userMode && I18N[LANG][modeKey]) ? I18N[LANG][modeKey] : (S.userMode || '–');
+  }
 
-  // Backup
-  const bon = S.backup === 'on';
-  $('m_backup').textContent = S.backup === '–' ? '–' : (bon ? t('yes_l') : t('no_l'));
-  $('m_backup').style.color = bon ? 'var(--on)' : 'var(--t3)';
+  // Backup (skip if in edit mode)
+  if ($('m_backup')) {
+    const bon = S.backup === 'on';
+    $('m_backup').textContent = S.backup === '–' ? '–' : (bon ? t('yes_l') : t('no_l'));
+    $('m_backup').style.color = bon ? 'var(--on)' : 'var(--t3)';
+  }
 
   // Electrical
   $('m_battv').textContent = fmt(S.battVolt, 2);
@@ -758,10 +825,10 @@ function renderSystem() {
   $('m_cyc_calc').textContent = fmt(S.cyclesCalc, 2);
   $('m_rt_month').textContent = fmt(S.roundtripMonth, 1);
 
-  // Limits
-  $('m_max_chg').textContent  = fmtInt(S.maxCharge);
-  $('m_max_dchg').textContent = fmtInt(S.maxDischarge);
-  $('m_set_dchg').textContent = fmtInt(S.setDischarge);
+  // Limits (skip if in edit mode)
+  if ($('m_max_chg'))  $('m_max_chg').textContent  = fmtInt(S.maxCharge);
+  if ($('m_max_dchg')) $('m_max_dchg').textContent = fmtInt(S.maxDischarge);
+  if ($('m_set_dchg')) $('m_set_dchg').textContent = fmtInt(S.setDischarge);
 
   // Device info
   $('m_dev_name').textContent = S.deviceName || '–';
