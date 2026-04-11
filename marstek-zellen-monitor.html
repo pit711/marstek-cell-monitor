@@ -517,7 +517,7 @@ function showDashboard() {
       <div class="sec"><div class="sec-t">${t('sec_system')}</div>
         <div class="row r4">
           <div class="c"><div class="lbl">${t('lbl_soc')}</div><div class="val big" style="color:var(--batt)"><span id="m_soc">–</span><span class="u"> %</span></div><div class="sub" id="m_soc_sub">&nbsp;</div></div>
-          <div class="c"><div class="lbl">${t('lbl_batt_power')}</div><div class="val big" id="m_battpw">–<span class="u"> W</span></div><div class="sub" id="m_battpw_sub">–</div></div>
+          <div class="c"><div class="lbl">${t('lbl_batt_power')}</div><div class="val big" id="m_battpw">–<span class="u"> W</span></div><div class="sub">&nbsp;</div></div>
           <div class="c"><div class="lbl">${t('lbl_ac_power')}</div><div class="val big" style="color:var(--haus)"><span id="m_acpw">–</span><span class="u"> W</span></div><div class="sub">&nbsp;</div></div>
           <div class="c"><div class="lbl">${t('lbl_inv_state')}</div><div class="val" id="m_inv">–</div><div class="sub">&nbsp;</div></div>
         </div>
@@ -693,20 +693,17 @@ function renderSystem() {
     $('m_soc').parentElement.style.color = socCol;
   }
 
-  // Battery power: negative = discharge (raw modbus convention on Venus E)
+  // Battery power: Marstek Venus E (ViperRNMC modbus) — positive = discharge, negative = charge
   const bp = S.battPower;
   if (bp == null) {
     $('m_battpw').innerHTML = '–<span class="u"> W</span>';
-    $('m_battpw_sub').textContent = '–';
   } else {
     const abs = Math.abs(bp);
-    let arrow = '', lbl = t('st_idle'), col = 'var(--t2)';
-    // Marstek Venus E (ViperRNMC modbus): positive = discharge, negative = charge
-    if (bp > 5)       { arrow = '↑ '; lbl = t('st_discharging'); col = 'var(--accent)'; }
-    else if (bp < -5) { arrow = '↓ '; lbl = t('st_charging');    col = 'var(--on)'; }
+    let arrow = '', col = 'var(--t2)';
+    if (bp > 5)       { arrow = '↑ '; col = 'var(--accent)'; }
+    else if (bp < -5) { arrow = '↓ '; col = 'var(--on)'; }
     $('m_battpw').innerHTML = arrow + abs.toFixed(0) + '<span class="u"> W</span>';
     $('m_battpw').style.color = col;
-    $('m_battpw_sub').textContent = lbl;
   }
 
   // AC power
