@@ -248,6 +248,7 @@ const I18N = {
     yes_l: 'Ja', no_l: 'Nein',
     st_charging: 'Lädt', st_discharging: 'Entlädt', st_idle: 'Standby',
     of_word: 'von',
+    mode_manual: 'Manuell', mode_anti_feed: 'Nulleinspeisung', mode_trade_mode: 'Handelsmodus',
     locale: 'de-DE'
   },
   en: {
@@ -363,6 +364,7 @@ const I18N = {
     yes_l: 'Yes', no_l: 'No',
     st_charging: 'Charging', st_discharging: 'Discharging', st_idle: 'Idle',
     of_word: 'of',
+    mode_manual: 'Manual', mode_anti_feed: 'Zero feed-in', mode_trade_mode: 'Trade mode',
     locale: 'en-US'
   }
 };
@@ -731,8 +733,9 @@ function renderSystem() {
   // Temperature
   $('m_temp').textContent = fmt(S.temp, 1);
 
-  // User mode
-  $('m_mode').textContent = S.userMode || '–';
+  // User mode (translate known values)
+  const modeKey = 'mode_' + (S.userMode || '');
+  $('m_mode').textContent = (S.userMode && I18N[LANG][modeKey]) ? I18N[LANG][modeKey] : (S.userMode || '–');
 
   // Backup
   const bon = S.backup === 'on';
