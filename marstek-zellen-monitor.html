@@ -24,7 +24,10 @@
   .row{display:grid;gap:14px;margin-bottom:18px}
   .r3{grid-template-columns:repeat(3,1fr)}
   .r4{grid-template-columns:repeat(4,1fr)}
-  @media(max-width:700px){.r3,.r4{grid-template-columns:1fr}}
+  .r5{grid-template-columns:repeat(5,1fr)}
+  @media(max-width:900px){.r5{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:700px){.r3,.r4,.r5{grid-template-columns:1fr}}
+  .chip{display:inline-block;padding:3px 10px;border:2px solid var(--brd);background:var(--bg2);font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
   .c{background:var(--bg1);border:2px solid var(--brd);padding:18px;position:relative}
   .c::before{content:'';position:absolute;top:0;left:0;right:0;height:5px;background:var(--batt)}
   .lbl{font-size:0.85rem;text-transform:uppercase;letter-spacing:.04em;color:var(--t2);margin-bottom:8px;font-weight:700}
@@ -78,7 +81,55 @@ const LANG_KEY = 'marstek_zellen_lang';
 let cfg = null;
 let ws = null, mid = 1, cbs = {};
 let chCells = null, chHist = null, chDelta = null;
-const S = { connected: false, cells: new Array(16).fill(0), soc: 0, battTemp: 0, invState: '–' };
+const S = {
+  connected: false,
+  cells: new Array(16).fill(0),
+  soc: null, stored: null, capacity: null,
+  battPower: null, battVolt: null, battCurr: null,
+  acPower: null, acVolt: null, acCurr: null, acFreq: null,
+  temp: null, invState: '–',
+  totalCharge: null, totalDischarge: null,
+  cyclesBMS: null, cyclesCalc: null,
+  roundtrip: null, roundtripMonth: null, conversion: null,
+  deviceName: '–', mac: '–',
+  bmsVer: '–', emsVer: '–', vmsVer: '–', commFw: '–',
+  userMode: '–', backup: '–',
+  maxCharge: null, maxDischarge: null, setDischarge: null,
+  updateInstalled: '–', updateLatest: '–', updateAvail: false
+};
+const MP = 'sensor.marstek_venus_modbus_';
+const ENTITY_MAP = {
+  [MP+'soc_batterie']:             ['soc','num'],
+  [MP+'gespeicherte_energie']:     ['stored','num'],
+  [MP+'batterie_gesamtenergie']:   ['capacity','num'],
+  [MP+'batterieleistung']:         ['battPower','num'],
+  [MP+'batteriespannung']:         ['battVolt','num'],
+  [MP+'batteriestrom']:            ['battCurr','num'],
+  [MP+'ac_leistung']:              ['acPower','num'],
+  [MP+'ac_spannung']:              ['acVolt','num'],
+  [MP+'ac_strom']:                 ['acCurr','num'],
+  [MP+'ac_frequenz']:              ['acFreq','num'],
+  [MP+'innentemperatur']:          ['temp','num'],
+  [MP+'wechselrichter_status']:    ['invState','str'],
+  [MP+'gesamte_ladeenergie']:      ['totalCharge','num'],
+  [MP+'gesamte_entladeenergie']:   ['totalDischarge','num'],
+  [MP+'vollzyklen_bms']:           ['cyclesBMS','num'],
+  [MP+'vollzyklen_berechnet']:     ['cyclesCalc','num'],
+  [MP+'gesamt_roundtrip_effizienz']:     ['roundtrip','num'],
+  [MP+'monatliche_roundtrip_effizienz']: ['roundtripMonth','num'],
+  [MP+'umwandlungseffizienz']:     ['conversion','num'],
+  [MP+'geratename']:               ['deviceName','str'],
+  [MP+'mac_adresse']:              ['mac','str'],
+  [MP+'bms_version']:              ['bmsVer','str'],
+  [MP+'ems_version']:              ['emsVer','str'],
+  [MP+'vms_version']:              ['vmsVer','str'],
+  [MP+'kommunikationsmodul_firmware']: ['commFw','str'],
+  'select.marstek_venus_modbus_benutzer_modus':       ['userMode','str'],
+  'switch.marstek_venus_modbus_backup_funktion':      ['backup','str'],
+  'number.marstek_venus_modbus_maximale_ladeleistung':    ['maxCharge','num'],
+  'number.marstek_venus_modbus_maximale_entladeleistung': ['maxDischarge','num'],
+  'number.marstek_venus_modbus_entladeleistung_einstellen':['setDischarge','num']
+};
 
 // ════════════════════════════════════════
 // i18n
@@ -158,6 +209,45 @@ const I18N = {
     health_excellent: 'Hervorragend', health_good: 'Gut', health_ok: 'Akzeptabel', health_watch: 'Beobachten', health_bad: 'Kritisch – Service nötig',
     eval_ok: 'Optimal', eval_mild: 'Leicht abweichend', eval_strong: 'Stark abweichend', eval_unsafe: 'Außerhalb Sicherheit!',
     active: 'aktiv', cell_short: 'Z',
+    sec_system: 'Systemübersicht',
+    sec_electrical: 'Elektrische Werte',
+    sec_energy: 'Energiebilanz',
+    sec_opmode: 'Betrieb & Limits',
+    sec_device: 'Geräte-Info',
+    lbl_soc: 'Ladezustand',
+    lbl_batt_power: 'Batterie-Leistung',
+    lbl_ac_power: 'AC-Leistung',
+    lbl_inv_state: 'Wechselrichter',
+    lbl_stored: 'Gespeicherte Energie',
+    lbl_capacity: 'Kapazität',
+    lbl_temp: 'Innentemperatur',
+    lbl_user_mode: 'Betriebsmodus',
+    lbl_backup: 'Backup-Funktion',
+    lbl_batt_volt: 'Batteriespannung',
+    lbl_batt_curr: 'Batteriestrom',
+    lbl_ac_volt: 'AC-Spannung',
+    lbl_ac_curr: 'AC-Strom',
+    lbl_ac_freq: 'AC-Frequenz',
+    lbl_total_charge: 'Geladen gesamt',
+    lbl_total_discharge: 'Entladen gesamt',
+    lbl_roundtrip: 'Roundtrip-Effizienz',
+    lbl_roundtrip_month: 'Roundtrip (Monat)',
+    lbl_conversion: 'Umwandlungseffizienz',
+    lbl_cycles_bms: 'Zyklen (BMS)',
+    lbl_cycles_calc: 'Zyklen (berechnet)',
+    lbl_max_charge: 'Max. Ladeleistung',
+    lbl_max_discharge: 'Max. Entladeleistung',
+    lbl_set_discharge: 'Entlade-Sollwert',
+    lbl_dev_name: 'Gerätename',
+    lbl_mac: 'MAC-Adresse',
+    lbl_bms_ver: 'BMS-Version',
+    lbl_ems_ver: 'EMS-Version',
+    lbl_vms_ver: 'VMS-Version',
+    lbl_comm_fw: 'Kommunikationsmodul',
+    lbl_update: 'Update verfügbar',
+    yes_l: 'Ja', no_l: 'Nein',
+    st_charging: 'Lädt', st_discharging: 'Entlädt', st_idle: 'Standby',
+    of_word: 'von',
     locale: 'de-DE'
   },
   en: {
@@ -234,6 +324,45 @@ const I18N = {
     health_excellent: 'Excellent', health_good: 'Good', health_ok: 'Acceptable', health_watch: 'Monitor', health_bad: 'Critical – service required',
     eval_ok: 'Optimal', eval_mild: 'Slightly deviating', eval_strong: 'Strongly deviating', eval_unsafe: 'Outside safety!',
     active: 'active', cell_short: 'C',
+    sec_system: 'System Overview',
+    sec_electrical: 'Electrical Readings',
+    sec_energy: 'Energy Balance',
+    sec_opmode: 'Operation & Limits',
+    sec_device: 'Device Info',
+    lbl_soc: 'State of Charge',
+    lbl_batt_power: 'Battery Power',
+    lbl_ac_power: 'AC Power',
+    lbl_inv_state: 'Inverter',
+    lbl_stored: 'Stored Energy',
+    lbl_capacity: 'Capacity',
+    lbl_temp: 'Inner Temperature',
+    lbl_user_mode: 'Operation Mode',
+    lbl_backup: 'Backup Function',
+    lbl_batt_volt: 'Battery Voltage',
+    lbl_batt_curr: 'Battery Current',
+    lbl_ac_volt: 'AC Voltage',
+    lbl_ac_curr: 'AC Current',
+    lbl_ac_freq: 'AC Frequency',
+    lbl_total_charge: 'Total Charged',
+    lbl_total_discharge: 'Total Discharged',
+    lbl_roundtrip: 'Round-trip Efficiency',
+    lbl_roundtrip_month: 'Round-trip (month)',
+    lbl_conversion: 'Conversion Efficiency',
+    lbl_cycles_bms: 'Cycles (BMS)',
+    lbl_cycles_calc: 'Cycles (calculated)',
+    lbl_max_charge: 'Max Charge Power',
+    lbl_max_discharge: 'Max Discharge Power',
+    lbl_set_discharge: 'Discharge Setpoint',
+    lbl_dev_name: 'Device Name',
+    lbl_mac: 'MAC Address',
+    lbl_bms_ver: 'BMS Version',
+    lbl_ems_ver: 'EMS Version',
+    lbl_vms_ver: 'VMS Version',
+    lbl_comm_fw: 'Comm Module',
+    lbl_update: 'Update Available',
+    yes_l: 'Yes', no_l: 'No',
+    st_charging: 'Charging', st_discharging: 'Discharging', st_idle: 'Idle',
+    of_word: 'of',
     locale: 'en-US'
   }
 };
@@ -385,6 +514,31 @@ function showDashboard() {
         </div>
       </div>
 
+      <div class="sec"><div class="sec-t">${t('sec_system')}</div>
+        <div class="row r4">
+          <div class="c"><div class="lbl">${t('lbl_soc')}</div><div class="val big" style="color:var(--batt)"><span id="m_soc">–</span><span class="u"> %</span></div><div class="sub" id="m_soc_sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_batt_power')}</div><div class="val big" id="m_battpw">–<span class="u"> W</span></div><div class="sub" id="m_battpw_sub">–</div></div>
+          <div class="c"><div class="lbl">${t('lbl_ac_power')}</div><div class="val big" style="color:var(--haus)"><span id="m_acpw">–</span><span class="u"> W</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_inv_state')}</div><div class="val" id="m_inv">–</div><div class="sub">&nbsp;</div></div>
+        </div>
+        <div class="row r4">
+          <div class="c"><div class="lbl">${t('lbl_stored')}</div><div class="val big" style="color:var(--batt)"><span id="m_stored">–</span><span class="u"> kWh</span></div><div class="sub" id="m_stored_sub">–</div></div>
+          <div class="c"><div class="lbl">${t('lbl_temp')}</div><div class="val big"><span id="m_temp">–</span><span class="u"> °C</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_user_mode')}</div><div class="val" id="m_mode">–</div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_backup')}</div><div class="val" id="m_backup">–</div><div class="sub">&nbsp;</div></div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-t">${t('sec_electrical')}</div>
+        <div class="row r5">
+          <div class="c"><div class="lbl">${t('lbl_batt_volt')}</div><div class="val"><span id="m_battv">–</span><span class="u"> V</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_batt_curr')}</div><div class="val"><span id="m_batta">–</span><span class="u"> A</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_ac_volt')}</div><div class="val"><span id="m_acv">–</span><span class="u"> V</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_ac_curr')}</div><div class="val"><span id="m_aca">–</span><span class="u"> A</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_ac_freq')}</div><div class="val"><span id="m_acf">–</span><span class="u"> Hz</span></div><div class="sub">&nbsp;</div></div>
+        </div>
+      </div>
+
       <div class="sec"><div class="sec-t">${t('sec_bms')}</div>
         <div class="row r4">
           <div class="c"><div class="lbl">${t('lbl_pack')}</div><div class="val big" style="color:var(--batt)"><span id="z_total">–</span><span class="u"> V</span></div><div class="sub" id="z_total_sub">–</div></div>
@@ -435,6 +589,39 @@ function showDashboard() {
           <tr><td>${t('th_delta_crit')}</td><td>${t('th_delta_crit_v')}</td></tr>
         </table>
       </div>
+
+      <div class="sec"><div class="sec-t">${t('sec_energy')}</div>
+        <div class="row r4">
+          <div class="c"><div class="lbl">${t('lbl_total_charge')}</div><div class="val" style="color:var(--on)"><span id="m_totchg">–</span><span class="u"> kWh</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_total_discharge')}</div><div class="val" style="color:var(--accent)"><span id="m_totdchg">–</span><span class="u"> kWh</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_roundtrip')}</div><div class="val"><span id="m_rt">–</span><span class="u"> %</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_conversion')}</div><div class="val"><span id="m_conv">–</span><span class="u"> %</span></div><div class="sub">&nbsp;</div></div>
+        </div>
+        <div class="row r3">
+          <div class="c"><div class="lbl">${t('lbl_cycles_bms')}</div><div class="val"><span id="m_cyc_bms">–</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_cycles_calc')}</div><div class="val"><span id="m_cyc_calc">–</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_roundtrip_month')}</div><div class="val"><span id="m_rt_month">–</span><span class="u"> %</span></div><div class="sub">&nbsp;</div></div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-t">${t('sec_opmode')}</div>
+        <div class="row r3">
+          <div class="c"><div class="lbl">${t('lbl_max_charge')}</div><div class="val"><span id="m_max_chg">–</span><span class="u"> W</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_max_discharge')}</div><div class="val"><span id="m_max_dchg">–</span><span class="u"> W</span></div><div class="sub">&nbsp;</div></div>
+          <div class="c"><div class="lbl">${t('lbl_set_discharge')}</div><div class="val"><span id="m_set_dchg">–</span><span class="u"> W</span></div><div class="sub">&nbsp;</div></div>
+        </div>
+      </div>
+
+      <div class="sec"><div class="sec-t">${t('sec_device')}</div>
+        <table class="info-tbl">
+          <tr><td>${t('lbl_dev_name')}</td><td id="m_dev_name">–</td></tr>
+          <tr><td>${t('lbl_mac')}</td><td id="m_dev_mac">–</td></tr>
+          <tr><td>${t('lbl_bms_ver')}</td><td id="m_dev_bms">–</td></tr>
+          <tr><td>${t('lbl_ems_ver')}</td><td id="m_dev_ems">–</td></tr>
+          <tr><td>${t('lbl_vms_ver')}</td><td id="m_dev_vms">–</td></tr>
+          <tr><td>${t('lbl_comm_fw')}</td><td id="m_dev_comm">–</td></tr>
+        </table>
+      </div>
     </div>
   `;
   setInterval(() => { const c = document.getElementById('clock'); if (c) c.textContent = new Date().toLocaleTimeString(t('locale')); }, 1000);
@@ -462,12 +649,126 @@ function subscribe() { send({ type: 'subscribe_events', event_type: 'state_chang
 function updateConn() { const d = document.getElementById('conn'); if (d) d.className = 'conn ' + (S.connected ? 'ok' : ''); }
 
 function handleState(s) {
-  const eid = s.entity_id, val = parseFloat(s.state);
+  const eid = s.entity_id;
   const m = eid.match(new RegExp(cfg.prefix.replace(/\./g, '\\.') + '(\\d+)_spannung'));
-  if (m) { const idx = parseInt(m[1]) - 1; if (idx >= 0 && idx < 16) { S.cells[idx] = isNaN(val) ? 0 : val; renderCells(); } return; }
-  if (eid === 'sensor.marstek_venus_modbus_soc_batterie') S.soc = isNaN(val) ? 0 : val;
-  if (eid === 'sensor.marstek_venus_modbus_innentemperatur') S.battTemp = isNaN(val) ? 0 : val;
-  if (eid === 'sensor.marstek_venus_modbus_wechselrichter_status') S.invState = s.state;
+  if (m) {
+    const val = parseFloat(s.state);
+    const idx = parseInt(m[1]) - 1;
+    if (idx >= 0 && idx < 16) { S.cells[idx] = isNaN(val) ? 0 : val; renderCells(); }
+    return;
+  }
+  const entry = ENTITY_MAP[eid];
+  if (!entry) return;
+  const [key, kind] = entry;
+  if (s.state === 'unavailable' || s.state === 'unknown') {
+    S[key] = kind === 'num' ? null : '–';
+  } else if (kind === 'num') {
+    const v = parseFloat(s.state);
+    S[key] = isNaN(v) ? null : v;
+  } else {
+    S[key] = s.state;
+  }
+  scheduleRender();
+}
+
+let _renderPending = false;
+function scheduleRender() {
+  if (_renderPending) return;
+  _renderPending = true;
+  requestAnimationFrame(() => { _renderPending = false; renderSystem(); });
+}
+
+function renderSystem() {
+  const $ = id => document.getElementById(id);
+  if (!$('m_soc')) return;
+  const fmt = (v, d) => v == null ? '–' : v.toFixed(d);
+  const fmtInt = v => v == null ? '–' : Math.round(v).toString();
+
+  // SoC + progress hint
+  $('m_soc').textContent = fmt(S.soc, 1);
+  if (S.soc != null) {
+    let socCol = 'var(--on)';
+    if (S.soc < 20) socCol = 'var(--danger)';
+    else if (S.soc < 40) socCol = 'var(--warn)';
+    $('m_soc').parentElement.style.color = socCol;
+  }
+
+  // Battery power: negative = discharge (raw modbus convention on Venus E)
+  const bp = S.battPower;
+  if (bp == null) {
+    $('m_battpw').innerHTML = '–<span class="u"> W</span>';
+    $('m_battpw_sub').textContent = '–';
+  } else {
+    const abs = Math.abs(bp);
+    let arrow = '', lbl = t('st_idle'), col = 'var(--t2)';
+    if (bp > 5)       { arrow = '↑ '; lbl = t('st_discharging'); col = 'var(--accent)'; }
+    else if (bp < -5) { arrow = '↓ '; lbl = t('st_charging');    col = 'var(--on)'; }
+    $('m_battpw').innerHTML = arrow + abs.toFixed(0) + '<span class="u"> W</span>';
+    $('m_battpw').style.color = col;
+    $('m_battpw_sub').textContent = lbl;
+  }
+
+  // AC power
+  $('m_acpw').textContent = fmtInt(S.acPower);
+
+  // Inverter state
+  const invRaw = (S.invState || '–');
+  $('m_inv').textContent = invRaw;
+  let invCol = 'var(--t1)';
+  const st = invRaw.toLowerCase();
+  if (st.includes('discharg'))      invCol = 'var(--accent)';
+  else if (st.includes('charg'))    invCol = 'var(--on)';
+  else if (st.includes('standby') || st.includes('idle')) invCol = 'var(--t3)';
+  $('m_inv').style.color = invCol;
+
+  // Stored / capacity
+  if (S.stored != null) $('m_stored').textContent = S.stored.toFixed(2);
+  if (S.stored != null && S.capacity != null) {
+    const pct = (S.stored / S.capacity) * 100;
+    $('m_stored_sub').textContent = `${t('of_word')} ${S.capacity.toFixed(2)} kWh · ${pct.toFixed(0)}%`;
+  } else if (S.capacity != null) {
+    $('m_stored_sub').textContent = `${t('of_word')} ${S.capacity.toFixed(2)} kWh`;
+  }
+
+  // Temperature
+  $('m_temp').textContent = fmt(S.temp, 1);
+
+  // User mode
+  $('m_mode').textContent = S.userMode || '–';
+
+  // Backup
+  const bon = S.backup === 'on';
+  $('m_backup').textContent = S.backup === '–' ? '–' : (bon ? t('yes_l') : t('no_l'));
+  $('m_backup').style.color = bon ? 'var(--on)' : 'var(--t3)';
+
+  // Electrical
+  $('m_battv').textContent = fmt(S.battVolt, 2);
+  $('m_batta').textContent = fmt(S.battCurr, 2);
+  $('m_acv').textContent   = fmt(S.acVolt, 1);
+  $('m_aca').textContent   = fmt(S.acCurr, 2);
+  $('m_acf').textContent   = fmt(S.acFreq, 2);
+
+  // Energy balance
+  $('m_totchg').textContent   = fmt(S.totalCharge, 2);
+  $('m_totdchg').textContent  = fmt(S.totalDischarge, 2);
+  $('m_rt').textContent       = fmt(S.roundtrip, 1);
+  $('m_conv').textContent     = fmt(S.conversion, 1);
+  $('m_cyc_bms').textContent  = fmtInt(S.cyclesBMS);
+  $('m_cyc_calc').textContent = fmt(S.cyclesCalc, 2);
+  $('m_rt_month').textContent = fmt(S.roundtripMonth, 1);
+
+  // Limits
+  $('m_max_chg').textContent  = fmtInt(S.maxCharge);
+  $('m_max_dchg').textContent = fmtInt(S.maxDischarge);
+  $('m_set_dchg').textContent = fmtInt(S.setDischarge);
+
+  // Device info
+  $('m_dev_name').textContent = S.deviceName || '–';
+  $('m_dev_mac').textContent  = S.mac || '–';
+  $('m_dev_bms').textContent  = S.bmsVer || '–';
+  $('m_dev_ems').textContent  = S.emsVer || '–';
+  $('m_dev_vms').textContent  = S.vmsVer || '–';
+  $('m_dev_comm').textContent = S.commFw || '–';
 }
 
 // ════════════════════════════════════════
