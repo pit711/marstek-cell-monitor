@@ -184,7 +184,7 @@ const I18N = {
     lbl_status: 'Status',
     lbl_balancing: 'Balancing',
     sec_cells: 'Zellspannungen (alle 16)',
-    cells_legend: 'Petrol = optimal · Bernstein = abweichend · Rot = kritisch',
+    cells_legend: 'Grün = optimal · Orange = abweichend · Rot = kritisch',
     sec_hist: 'Verlauf 24h – Min/Max/Ø',
     sec_delta: 'Delta-Verlauf 24h',
     sec_health: '🏥 Pack-Gesundheit',
@@ -299,7 +299,7 @@ const I18N = {
     lbl_status: 'Status',
     lbl_balancing: 'Balancing',
     sec_cells: 'Cell Voltages (all 16)',
-    cells_legend: 'Petrol = optimal · Amber = deviating · Red = critical',
+    cells_legend: 'Green = optimal · Orange = deviating · Red = critical',
     sec_hist: '24h History – Min/Max/Avg',
     sec_delta: '24h Delta History',
     sec_health: '🏥 Pack Health',
@@ -840,12 +840,15 @@ function initCharts() {
 }
 
 function cellColor(v, vmin, vmax) {
+  // critical (red): outside safety window or large deviation from mid
   if (v < 2.7 || v > 3.55) return '#b91c1c';
-  if (v < 2.9 || v > 3.5) return '#c2410c';
   const dev = Math.abs(v - ((vmin + vmax) / 2));
-  if (dev > 0.030) return '#a16207';
-  if (dev > 0.015) return '#15803d';
-  return '#0e7490';
+  if (dev > 0.030) return '#b91c1c';
+  // deviating (orange): approaching safety limits or mild deviation
+  if (v < 2.9 || v > 3.5) return '#c2410c';
+  if (dev > 0.010) return '#c2410c';
+  // optimal (green)
+  return '#15803d';
 }
 
 function renderCells() {
