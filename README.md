@@ -2,6 +2,10 @@
 
 Single-file HTML dashboard for live monitoring of all 16 cell voltages of a **Marstek Venus E** LiFePO4 battery via **Home Assistant**. No build step, no server, no cloud – just open the HTML file in a browser.
 
+## Disclaimer
+
+This project is not affiliated with, endorsed by, or associated with Marstek Energy Technology. Marstek and Venus are trademarks of their respective owners. Home Assistant is a trademark of Nabu Casa, Inc. This is an independent community project for interoperability purposes.
+
 Bilingual UI: **Deutsch / English** (switchable in the setup wizard and in the dashboard header).
 
 ![dashboard](https://img.shields.io/badge/single--file-HTML-blue) ![deps-none](https://img.shields.io/badge/deps-Chart.js%20CDN-lightgrey) ![license](https://img.shields.io/badge/license-MIT-green)
@@ -60,6 +64,10 @@ The dashboard expects 16 sensors matching `{prefix}{1..16}_spannung`. If your HA
 - Token and URL are stored **exclusively** in your browser's localStorage
 - No telemetry, no analytics, no external servers beyond the Chart.js CDN
 - The file can be self-hosted or used fully offline (just vendor Chart.js locally)
+
+**Note:** Chart.js is loaded once from cdn.jsdelivr.net. Your IP address may be disclosed to this CDN provider. For full GDPR compliance, you can download Chart.js and host it locally.
+
+**Security Note:** Your Home Assistant access token is stored in your browser's localStorage (unencrypted). Only use this tool in a trusted, private browser context. Consider using sessionStorage or clearing localStorage when done.
 
 ## Screenshots
 
