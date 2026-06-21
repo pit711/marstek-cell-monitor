@@ -10,6 +10,9 @@ Bilingual UI: **Deutsch / English** (switchable in the setup wizard and in the d
 
 ![dashboard](https://img.shields.io/badge/single--file-HTML-blue) ![deps-none](https://img.shields.io/badge/deps-Chart.js%20CDN-lightgrey) ![license](https://img.shields.io/badge/license-MIT-green)
 
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/711it)
+[![PayPal](https://img.shields.io/badge/PayPal-tip-00457C?logo=paypal&logoColor=white)](https://paypal.me/711IT)
+
 ## Features
 
 - Live view of all 16 individual cell voltages (WebSocket subscription to HA)
@@ -72,6 +75,13 @@ The dashboard expects 16 sensors matching `{prefix}{1..16}_spannung`. If your HA
 ## Screenshots
 
 Setup wizard and dashboard run in any modern browser – no installation required.
+
+## Support
+
+This project is free and open-source. If it's useful to you, a small tip keeps it going:
+
+- ☕ **Ko-fi:** https://ko-fi.com/711it
+- 💸 **PayPal:** https://paypal.me/711IT
 
 ## License
 
